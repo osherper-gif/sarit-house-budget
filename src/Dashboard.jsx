@@ -2,7 +2,7 @@
 // Dashboard.jsx — מסך ראשי: KPI, ניצול תקציב, פירוט לפי שלבים
 // + באנר תזכורת גיבוי שבועי
 // ============================================================
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Wallet,
   TrendingUp,
@@ -10,8 +10,15 @@ import {
   AlertTriangle,
   BellRing,
   X,
+  Bot,
+  CheckSquare,
+  CreditCard,
+  Sparkles,
+  PhoneCall,
+  MessageCircle,
 } from "lucide-react";
 import { BACKUP_REMINDER_MS } from "./config";
+import { buildInsights, telHref, waHref, waPhone } from "./insights";
 import {
   ResponsiveContainer,
   RadialBarChart,
@@ -44,6 +51,143 @@ function Kpi({ icon: Icon, label, value, color, sub }) {
         <div className="truncate text-xs font-medium text-slate-500">{label}</div>
         <div className="truncate text-lg font-extrabold tabular-nums">{value}</div>
         {sub && <div className="text-[11px] text-slate-400">{sub}</div>}
+      </div>
+    </div>
+  );
+}
+
+// ---------- קופסת המלצות יומיות (AI Co-Pilot) ----------
+const INSIGHT_STYLES = {
+  verify: {
+    icon: CheckSquare,
+    box: "border-sky-200 bg-sky-50",
+    chip: "bg-sky-100 text-sky-600",
+    text: "text-sky-900",
+    label: "לוודא ש...",
+  },
+  pay: {
+    icon: CreditCard,
+    box: "border-amber-200 bg-amber-50",
+    chip: "bg-amber-100 text-amber-600",
+    text: "text-amber-900",
+    label: "לשלם ל...",
+  },
+  risk: {
+    icon: AlertTriangle,
+    box: "border-red-200 bg-red-50",
+    chip: "bg-red-100 text-red-600",
+    text: "text-red-900",
+    label: "להיזהר מ...",
+  },
+  success: {
+    icon: Sparkles,
+    box: "border-emerald-200 bg-emerald-50",
+    chip: "bg-emerald-100 text-emerald-600",
+    text: "text-emerald-900",
+    label: "כל הכבוד!",
+  },
+};
+
+const INSIGHTS_DISMISS_KEY = "insights-dismissed";
+
+function InsightCard({ insight, onDismiss }) {
+  const st = INSIGHT_STYLES[insight.type];
+  const Icon = st.icon;
+  const phone = insight.contractor?.phone?.trim();
+
+  return (
+    <div className={`relative rounded-xl border p-3 ${st.box}`}>
+      <div className="flex items-start gap-2.5 pe-6">
+        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${st.chip}`}>
+          <Icon className="h-4 w-4" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className={`mb-0.5 text-[10px] font-extrabold uppercase tracking-wide opacity-60 ${st.text}`}>
+            {st.label}
+          </div>
+          <p className={`text-sm leading-snug ${st.text}`}>{insight.text}</p>
+
+          {phone && waPhone(phone) && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              <a href={telHref(phone)} className="btn !py-1.5 !px-2.5 !text-xs border border-white/60 bg-white/70 text-slate-700 hover:bg-white">
+                <PhoneCall className="h-3.5 w-3.5" />
+                התקשר כעת
+              </a>
+              {insight.waText && (
+                <a
+                  href={waHref(phone, insight.waText)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn !py-1.5 !px-2.5 !text-xs bg-emerald-600 text-white hover:bg-emerald-700"
+                >
+                  <MessageCircle className="h-3.5 w-3.5" />
+                  שלח וואטסאפ
+                </a>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+      <button
+        onClick={onDismiss}
+        className={`absolute end-2 top-2 rounded-md p-0.5 opacity-40 hover:opacity-100 ${st.text}`}
+        aria-label="הסתרת ההמלצה"
+      >
+        <X className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+}
+
+function DailyInsights() {
+  const { data } = useBudget();
+  const [dismissed, setDismissed] = useState(() => {
+    try {
+      return new Set(JSON.parse(sessionStorage.getItem(INSIGHTS_DISMISS_KEY) || "[]"));
+    } catch {
+      return new Set();
+    }
+  });
+
+  const insights = useMemo(() => buildInsights(data), [data]);
+  const visible = insights.filter((i) => !dismissed.has(i.id));
+
+  const dismiss = (id) => {
+    const next = new Set(dismissed);
+    next.add(id);
+    setDismissed(next);
+    sessionStorage.setItem(INSIGHTS_DISMISS_KEY, JSON.stringify([...next]));
+  };
+
+  return (
+    <div className="card overflow-hidden">
+      <div className="flex items-center gap-2.5 border-b border-slate-100 bg-gradient-to-l from-indigo-50 to-white px-4 py-3">
+        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-600 text-white">
+          <Bot className="h-5 w-5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h2 className="font-bold leading-tight">קופסת המלצות יומיות</h2>
+          <p className="text-[11px] text-slate-400">
+            {new Date().toLocaleDateString("he-IL", { weekday: "long", day: "numeric", month: "long" })}
+          </p>
+        </div>
+        {visible.length > 0 && (
+          <span className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-bold text-indigo-700 tabular-nums">
+            {visible.length}
+          </span>
+        )}
+      </div>
+
+      <div className="space-y-2 p-3">
+        {visible.length === 0 ? (
+          <p className="py-3 text-center text-sm text-slate-400">
+            אין המלצות חדשות להיום — הכל מתקדם לפי התוכנית
+          </p>
+        ) : (
+          visible.map((ins) => (
+            <InsightCard key={ins.id} insight={ins} onDismiss={() => dismiss(ins.id)} />
+          ))
+        )}
       </div>
     </div>
   );
@@ -115,6 +259,9 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-4">
+      {/* המלצות יומיות — AI Co-Pilot */}
+      <DailyInsights />
+
       {/* תזכורת גיבוי שבועית */}
       <BackupReminder />
 
