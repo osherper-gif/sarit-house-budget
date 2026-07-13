@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   ListChecks,
   HardHat,
+  CalendarRange,
   Settings,
   Home,
   Lock,
@@ -18,11 +19,13 @@ import { APP_PASSWORD, AUTH_SESSION_KEY } from "./config";
 import Dashboard from "./Dashboard";
 import BudgetTable from "./BudgetTable";
 import ContractorTracker from "./ContractorTracker";
+import WorkPlan from "./WorkPlan";
 
 const TABS = [
   { id: "dashboard", label: "דשבורד", icon: LayoutDashboard, component: Dashboard },
   { id: "budget", label: "תקציב", icon: ListChecks, component: BudgetTable },
   { id: "contractors", label: "קבלנים", icon: HardHat, component: ContractorTracker },
+  { id: "workplan", label: "תוכנית עבודה", icon: CalendarRange, component: WorkPlan },
   { id: "settings", label: "גיבוי", icon: Settings, component: SettingsBackup },
 ];
 
@@ -148,14 +151,14 @@ function Shell() {
 
       {/* Bottom navigation — mobile first */}
       <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 backdrop-blur pb-[env(safe-area-inset-bottom)]">
-        <div className="mx-auto grid max-w-2xl grid-cols-4">
+        <div className="mx-auto grid max-w-2xl grid-cols-5">
           {TABS.map(({ id, label, icon: Icon }) => {
             const active = tab === id;
             return (
               <button
                 key={id}
                 onClick={() => setTab(id)}
-                className={`flex flex-col items-center gap-0.5 py-2.5 text-[11px] font-semibold transition-colors ${
+                className={`flex flex-col items-center gap-0.5 py-2.5 text-[10px] font-semibold transition-colors ${
                   active ? "text-indigo-600" : "text-slate-400 hover:text-slate-600"
                 }`}
                 aria-current={active ? "page" : undefined}

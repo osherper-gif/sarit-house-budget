@@ -1,6 +1,6 @@
 // ============================================================
 // ContractorTracker.jsx — קבלנים לפי תחום + פעימות תשלום
-// סימון "שולם" מתעדכן אוטומטית בתקציב ובדשבורד.
+// + פרטי קשר ופעולות מהירות: חיוג / וואטסאפ (ללא שרת, בחינם)
 // ============================================================
 import { useMemo, useState } from "react";
 import {
@@ -11,6 +11,11 @@ import {
   HardHat,
   CalendarDays,
   UserPlus,
+  Phone,
+  Mail,
+  User,
+  MessageCircle,
+  AlertTriangle,
 } from "lucide-react";
 import {
   useBudget,
@@ -19,8 +24,81 @@ import {
   pct,
   fmtDate,
   contractorPaid,
+  isBottleneck,
   ProgressBar,
 } from "./Utilities";
+
+// המרת טלפון ישראלי לפורמט בינלאומי עבור wa.me
+const waPhone = (p) => {
+  const digits = String(p || "").replace(/\D/g, "");
+  if (!digits) return null;
+  if (digits.startsWith("972")) return digits;
+  if (digits.startsWith("0")) return "972" + digits.slice(1);
+  return digits;
+};
+
+// הודעת וואטסאפ אוטומטית לפי סטטוס הפעימות
+const waMessage = (c) => {
+  const who = c.contactName || c.name;
+  const next = (c.milestones || []).find((m) => !m.isPaid);
+  if (!next) {
+    return `היי ${who}, רציתי לעדכן שכל פעימות התשלום עבור עבודות ה${c.trade} שולמו במלואן. תודה רבה על העבודה! שרית`;
+  }
+  return `היי ${who}, רציתי להתעדכן לגבי עבודות ה${c.trade}: הפעימה "${next.description}" בסך ${fmt(
+    num(next.amount)
+  )} ממתינה לביצוע/תשלום. אשמח לעדכון לגבי לוח הזמנים. תודה, שרית`;
+};
+
+function QuickActions({ contractor }) {
+  const phone = String(contractor.phone || "").trim();
+  const wa = waPhone(phone);
+  if (!phone) {
+    return (
+      <div className="rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-400">
+        הוסיפי מספר טלפון (בעריכת הקבלן) כדי להפעיל חיוג מהיר ווואטסאפ
+      </div>
+    );
+  }
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      <a
+        href={`tel:${phone}`}
+        className="btn border border-sky-200 bg-sky-50 py-2.5 text-sky-700 hover:bg-sky-100"
+      >
+        <Phone className="h-4 w-4" />
+        חיוג מהיר
+      </a>
+      <a
+        href={`https://wa.me/${wa}?text=${encodeURIComponent(waMessage(contractor))}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="btn bg-emerald-600 py-2.5 text-white hover:bg-emerald-700"
+      >
+        <MessageCircle className="h-4 w-4" />
+        שלח הודעת וואטסאפ
+      </a>
+    </div>
+  );
+}
+
+function ContactDetails({ contractor }) {
+  const rows = [
+    contractor.contactName && { icon: User, text: contractor.contactName },
+    contractor.phone && { icon: Phone, text: contractor.phone, dir: "ltr" },
+    contractor.email && { icon: Mail, text: contractor.email, dir: "ltr" },
+  ].filter(Boolean);
+  if (!rows.length) return null;
+  return (
+    <div className="flex flex-wrap gap-x-4 gap-y-1 rounded-xl border border-slate-200 bg-white px-3 py-2">
+      {rows.map(({ icon: Icon, text, dir }, i) => (
+        <span key={i} className="inline-flex items-center gap-1.5 text-xs text-slate-600">
+          <Icon className="h-3.5 w-3.5 text-slate-400" />
+          <span dir={dir}>{text}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
 
 function MilestoneRow({ contractor, m }) {
   const { toggleMilestone, updateMilestone, removeMilestone } = useBudget();
@@ -110,16 +188,20 @@ function ContractorCard({ contractor }) {
   const total = num(contractor.totalValue);
   const milestonesSum = contractor.milestones.reduce((s, m) => s + num(m.amount), 0);
   const mismatch = total > 0 && Math.abs(milestonesSum - total) > 1;
+  const late = isBottleneck(contractor);
 
   return (
-    <div className="card overflow-hidden">
+    <div className={`card overflow-hidden ${late ? "border-amber-300" : ""}`}>
       <button onClick={() => setOpen((v) => !v)} className="flex w-full items-center gap-3 p-4 text-start">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
           <HardHat className="h-5 w-5" />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
-            <span className="truncate font-bold">{contractor.name}</span>
+            <span className="flex min-w-0 items-center gap-1.5 font-bold">
+              {late && <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />}
+              <span className="truncate">{contractor.name}</span>
+            </span>
             <span className="shrink-0 text-xs font-semibold text-slate-500 tabular-nums">
               {fmt(paid)} / {fmt(total)}
             </span>
@@ -133,6 +215,16 @@ function ContractorCard({ contractor }) {
 
       {open && (
         <div className="space-y-3 border-t border-slate-100 bg-slate-50/60 p-3">
+          {late && (
+            <div className="flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              חלון העבודה המתוכנן הסתיים ונותרו פעימות פתוחות — ראי "תוכנית עבודה"
+            </div>
+          )}
+
+          <ContactDetails contractor={contractor} />
+          <QuickActions contractor={contractor} />
+
           {editing && (
             <div className="grid grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-white p-3">
               <label className="block">
@@ -162,11 +254,32 @@ function ContractorCard({ contractor }) {
                 />
               </label>
               <label className="block">
-                <span className="mb-1 block text-[11px] font-semibold text-slate-500">טלפון</span>
+                <span className="mb-1 block text-[11px] font-semibold text-slate-500">איש קשר</span>
                 <input
                   className="input"
+                  value={contractor.contactName || ""}
+                  onChange={(e) => updateContractor(contractor.id, { contactName: e.target.value })}
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-[11px] font-semibold text-slate-500">טלפון</span>
+                <input
+                  type="tel"
+                  dir="ltr"
+                  className="input"
+                  placeholder="050-1234567"
                   value={contractor.phone || ""}
                   onChange={(e) => updateContractor(contractor.id, { phone: e.target.value })}
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-[11px] font-semibold text-slate-500">אימייל</span>
+                <input
+                  type="email"
+                  dir="ltr"
+                  className="input"
+                  value={contractor.email || ""}
+                  onChange={(e) => updateContractor(contractor.id, { email: e.target.value })}
                 />
               </label>
               <label className="col-span-2 block">

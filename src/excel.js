@@ -59,7 +59,11 @@ export function buildWorkbook(data) {
       "שם הקבלן": c.name,
       "תחום": c.trade || "",
       "היקף חוזה": num(c.totalValue),
+      "איש קשר": c.contactName || "",
       "טלפון": c.phone || "",
+      "אימייל": c.email || "",
+      "תאריך התחלה": c.estimatedStartDate || "",
+      "משך בימים": c.durationDays || "",
       "הערות קבלן": c.notes || "",
     };
     if (!c.milestones?.length) {
@@ -79,7 +83,8 @@ export function buildWorkbook(data) {
   const ws2 = XLSX.utils.json_to_sheet(conRows);
   ws2["!cols"] = [
     { wch: 16 }, { wch: 26 }, { wch: 18 }, { wch: 12 }, { wch: 14 },
-    { wch: 28 }, { wch: 34 }, { wch: 12 }, { wch: 8 }, { wch: 14 },
+    { wch: 14 }, { wch: 22 }, { wch: 13 }, { wch: 10 }, { wch: 28 },
+    { wch: 34 }, { wch: 12 }, { wch: 8 }, { wch: 14 },
   ];
   XLSX.utils.book_append_sheet(wb, ws2, CONTRACTORS_SHEET);
 
@@ -160,7 +165,11 @@ export function parseWorkbook(wb) {
         name,
         trade: String(r["תחום"] ?? "").trim() || "כללי",
         totalValue: num(r["היקף חוזה"]),
+        contactName: String(r["איש קשר"] ?? "").trim(),
         phone: String(r["טלפון"] ?? "").trim(),
+        email: String(r["אימייל"] ?? "").trim(),
+        estimatedStartDate: parseDate(r["תאריך התחלה"]),
+        durationDays: num(r["משך בימים"]) || 0,
         notes: String(r["הערות קבלן"] ?? "").trim(),
         milestones: [],
       });

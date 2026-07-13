@@ -70,6 +70,25 @@ export const phaseTotals = (phase, contractors) =>
     { cost: 0, paid: 0 }
   );
 
+// ---------- תזמון (תוכנית עבודה) ----------
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+// מחזיר {start, end} או null אם לא הוגדר לוז לקבלן
+export const contractorSchedule = (c) => {
+  if (!c?.estimatedStartDate || !num(c.durationDays)) return null;
+  const start = new Date(c.estimatedStartDate);
+  if (isNaN(start)) return null;
+  return { start, end: new Date(start.getTime() + num(c.durationDays) * DAY_MS) };
+};
+
+// צוואר בקבוק: חלון העבודה הסתיים ונותרו פעימות שלא שולמו
+export const isBottleneck = (c) => {
+  const s = contractorSchedule(c);
+  if (!s) return false;
+  const hasUnpaid = (c.milestones || []).some((m) => !m.isPaid);
+  return hasUnpaid && s.end.getTime() < Date.now();
+};
+
 export const projectTotals = (data) => {
   let cost = 0,
     paid = 0,
@@ -191,6 +210,10 @@ export function BudgetProvider({ children }) {
       trade: "כללי",
       totalValue: 0,
       phone: "",
+      email: "",
+      contactName: "",
+      estimatedStartDate: null,
+      durationDays: 0,
       notes: "",
       milestones: [],
     };
