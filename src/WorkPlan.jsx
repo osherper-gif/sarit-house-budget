@@ -9,6 +9,7 @@ import {
   Pencil,
   CheckCircle2,
   Clock,
+  CalendarPlus,
 } from "lucide-react";
 import {
   useBudget,
@@ -19,6 +20,7 @@ import {
   contractorSchedule,
   isBottleneck,
 } from "./Utilities";
+import ContractorEditModal from "./ContractorEditModal";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const fmtShort = (d) =>
@@ -48,46 +50,8 @@ const STATUS_LABEL = {
   future: "מתוכנן",
 };
 
-function ScheduleEditor({ contractor }) {
-  const { updateContractor } = useBudget();
-  return (
-    <div className="mt-2 grid grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-white p-3">
-      <label className="block">
-        <span className="mb-1 block text-[11px] font-semibold text-slate-500">
-          תאריך התחלה משוער
-        </span>
-        <input
-          type="date"
-          className="input"
-          value={contractor.estimatedStartDate || ""}
-          onChange={(e) =>
-            updateContractor(contractor.id, {
-              estimatedStartDate: e.target.value || null,
-            })
-          }
-        />
-      </label>
-      <label className="block">
-        <span className="mb-1 block text-[11px] font-semibold text-slate-500">
-          משך בימים
-        </span>
-        <input
-          type="number"
-          inputMode="numeric"
-          min="0"
-          className="input"
-          value={contractor.durationDays || ""}
-          onChange={(e) =>
-            updateContractor(contractor.id, { durationDays: num(e.target.value) })
-          }
-        />
-      </label>
-    </div>
-  );
-}
-
 function TimelineRow({ contractor, range }) {
-  const [editing, setEditing] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
   const s = contractorSchedule(contractor);
   const status = rowStatus(contractor);
   const paid = contractorPaid(contractor);
@@ -129,7 +93,7 @@ function TimelineRow({ contractor, range }) {
             {STATUS_LABEL[status]}
           </span>
           <button
-            onClick={() => setEditing((v) => !v)}
+            onClick={() => setShowEdit(true)}
             className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
             aria-label="עריכת לוז"
           >
@@ -174,12 +138,18 @@ function TimelineRow({ contractor, range }) {
           </div>
         </>
       ) : (
-        <div className="rounded-lg border border-dashed border-slate-300 px-3 py-1.5 text-xs text-slate-400">
-          לא הוגדר לוז — לחצי על העיפרון להגדרת תאריך התחלה ומשך
-        </div>
+        <button
+          onClick={() => setShowEdit(true)}
+          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-indigo-300 bg-indigo-50/50 px-3 py-2 text-xs font-semibold text-indigo-600 hover:bg-indigo-50"
+        >
+          <CalendarPlus className="h-3.5 w-3.5" />
+          הגדר תאריך התחלה
+        </button>
       )}
 
-      {editing && <ScheduleEditor contractor={contractor} />}
+      {showEdit && (
+        <ContractorEditModal contractor={contractor} onClose={() => setShowEdit(false)} />
+      )}
     </div>
   );
 }
@@ -199,6 +169,13 @@ export default function WorkPlan() {
     max += pad;
     return { min, max, span: max - min };
   }, [data.contractors]);
+
+  // גם כשאין אף לוז מוגדר — מציגים את כל השורות עם כפתור "הגדר תאריך התחלה"
+  const effectiveRange = range ?? {
+    min: Date.now() - 30 * DAY_MS,
+    max: Date.now() + 30 * DAY_MS,
+    span: 60 * DAY_MS,
+  };
 
   const bottlenecks = data.contractors.filter(isBottleneck);
 
@@ -250,25 +227,27 @@ export default function WorkPlan() {
           <CalendarRange className="h-5 w-5 text-indigo-600" />
           <h2 className="text-lg font-bold">תוכנית עבודה</h2>
         </div>
-        {range ? (
+        {data.contractors.length === 0 ? (
+          <p className="py-6 text-center text-sm text-slate-400">
+            אין קבלנים עדיין — הוסיפי קבלנים בטאב "קבלנים"
+          </p>
+        ) : (
           <>
-            <div className="mb-3 flex items-center justify-between text-[11px] text-slate-400">
-              <span>{fmtShort(new Date(range.min))}</span>
-              <span className="flex items-center gap-1 font-semibold text-amber-600">
-                <span className="inline-block h-2.5 w-0.5 bg-amber-500" /> היום
-              </span>
-              <span>{fmtShort(new Date(range.max))}</span>
-            </div>
+            {range && (
+              <div className="mb-3 flex items-center justify-between text-[11px] text-slate-400">
+                <span>{fmtShort(new Date(range.min))}</span>
+                <span className="flex items-center gap-1 font-semibold text-amber-600">
+                  <span className="inline-block h-2.5 w-0.5 bg-amber-500" /> היום
+                </span>
+                <span>{fmtShort(new Date(range.max))}</span>
+              </div>
+            )}
             <div>
               {sorted.map((c) => (
-                <TimelineRow key={c.id} contractor={c} range={range} />
+                <TimelineRow key={c.id} contractor={c} range={effectiveRange} />
               ))}
             </div>
           </>
-        ) : (
-          <p className="py-6 text-center text-sm text-slate-400">
-            הגדירי תאריך התחלה ומשך לקבלנים כדי לראות את ציר הזמן
-          </p>
         )}
       </div>
 

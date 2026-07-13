@@ -107,12 +107,43 @@ export const projectTotals = (data) => {
 // ---------- context ----------
 const BudgetContext = createContext(null);
 
+// השלמת שדות חדשים בנתונים ישנים (LocalStorage / גיבויים מגרסאות קודמות):
+// קבלן ששמור בלי פרטי קשר או לוז — מקבל את הערכים מנתוני הבסיס (לפי מזהה),
+// כך שטאב "תוכנית עבודה" לא יוצג ריק אחרי עדכון גרסה.
+const CONTRACTOR_FIELD_DEFAULTS = {
+  phone: "",
+  email: "",
+  contactName: "",
+  estimatedStartDate: null,
+  durationDays: 0,
+};
+
+export function migrateData(parsed) {
+  return {
+    ...parsed,
+    contractors: (parsed.contractors || []).map((c) => {
+      const merged = { ...CONTRACTOR_FIELD_DEFAULTS, ...c };
+      const seed = initialData.contractors.find((s) => s.id === c.id);
+      if (seed) {
+        for (const k of Object.keys(CONTRACTOR_FIELD_DEFAULTS)) {
+          const isEmpty =
+            merged[k] === undefined || merged[k] === null || merged[k] === "" || merged[k] === 0;
+          const seedHas =
+            seed[k] !== undefined && seed[k] !== null && seed[k] !== "" && seed[k] !== 0;
+          if (isEmpty && seedHas) merged[k] = seed[k];
+        }
+      }
+      return merged;
+    }),
+  };
+}
+
 function loadInitial() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed?.phases && parsed?.contractors) return parsed;
+      if (parsed?.phases && parsed?.contractors) return migrateData(parsed);
     }
   } catch {
     /* corrupted storage — fall back to seed */
@@ -323,17 +354,19 @@ export function BudgetProvider({ children }) {
     if (!parsed || !Array.isArray(parsed.phases) || !Array.isArray(parsed.contractors)) {
       throw new Error("invalid");
     }
-    setData({
-      meta: {
-        schemaVersion: SCHEMA_VERSION,
-        projectName: parsed.meta?.projectName || "הבית של שרית",
-        currency: "ILS",
-        lastUpdated: null,
-        ...parsed.meta,
-      },
-      phases: parsed.phases,
-      contractors: parsed.contractors,
-    });
+    setData(
+      migrateData({
+        meta: {
+          schemaVersion: SCHEMA_VERSION,
+          projectName: parsed.meta?.projectName || "הבית של שרית",
+          currency: "ILS",
+          lastUpdated: null,
+          ...parsed.meta,
+        },
+        phases: parsed.phases,
+        contractors: parsed.contractors,
+      })
+    );
   }, []);
 
   const resetData = useCallback(() => setData(initialData), []);

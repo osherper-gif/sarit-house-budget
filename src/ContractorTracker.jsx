@@ -27,6 +27,7 @@ import {
   isBottleneck,
   ProgressBar,
 } from "./Utilities";
+import ContractorEditModal from "./ContractorEditModal";
 
 // המרת טלפון ישראלי לפורמט בינלאומי עבור wa.me
 const waPhone = (p) => {
@@ -180,9 +181,9 @@ function MilestoneRow({ contractor, m }) {
 }
 
 function ContractorCard({ contractor }) {
-  const { updateContractor, removeContractor, addMilestone } = useBudget();
+  const { removeContractor, addMilestone } = useBudget();
   const [open, setOpen] = useState(false);
-  const [editing, setEditing] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
 
   const paid = contractorPaid(contractor);
   const total = num(contractor.totalValue);
@@ -192,26 +193,46 @@ function ContractorCard({ contractor }) {
 
   return (
     <div className={`card overflow-hidden ${late ? "border-amber-300" : ""}`}>
-      <button onClick={() => setOpen((v) => !v)} className="flex w-full items-center gap-3 p-4 text-start">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
-          <HardHat className="h-5 w-5" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between gap-2">
-            <span className="flex min-w-0 items-center gap-1.5 font-bold">
-              {late && <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />}
-              <span className="truncate">{contractor.name}</span>
-            </span>
-            <span className="shrink-0 text-xs font-semibold text-slate-500 tabular-nums">
-              {fmt(paid)} / {fmt(total)}
-            </span>
+      <div className="flex items-center">
+        <button
+          onClick={() => setOpen((v) => !v)}
+          className="flex min-w-0 flex-1 items-center gap-3 p-4 text-start"
+        >
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+            <HardHat className="h-5 w-5" />
           </div>
-          <ProgressBar value={pct(paid, total)} className="mt-2" />
-        </div>
-        <ChevronDown
-          className={`h-5 w-5 shrink-0 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}
-        />
-      </button>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center justify-between gap-2">
+              <span className="flex min-w-0 items-center gap-1.5 font-bold">
+                {late && <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />}
+                <span className="truncate">{contractor.name}</span>
+              </span>
+              <span className="shrink-0 text-xs font-semibold text-slate-500 tabular-nums">
+                {fmt(paid)} / {fmt(total)}
+              </span>
+            </div>
+            <ProgressBar value={pct(paid, total)} className="mt-2" />
+          </div>
+        </button>
+        {/* עריכת פרטי הקבלן — צמוד לשם בכותרת */}
+        <button
+          onClick={() => setShowEdit(true)}
+          className="shrink-0 rounded-lg p-2 text-slate-400 hover:bg-indigo-50 hover:text-indigo-600"
+          aria-label={`עריכת פרטי ${contractor.name}`}
+          title="עריכת פרטי קבלן"
+        >
+          <Pencil className="h-4 w-4" />
+        </button>
+        <button
+          onClick={() => setOpen((v) => !v)}
+          className="shrink-0 p-2 pe-4 text-slate-400"
+          aria-label={open ? "סגירה" : "פתיחה"}
+        >
+          <ChevronDown
+            className={`h-5 w-5 transition-transform ${open ? "rotate-180" : ""}`}
+          />
+        </button>
+      </div>
 
       {open && (
         <div className="space-y-3 border-t border-slate-100 bg-slate-50/60 p-3">
@@ -224,74 +245,6 @@ function ContractorCard({ contractor }) {
 
           <ContactDetails contractor={contractor} />
           <QuickActions contractor={contractor} />
-
-          {editing && (
-            <div className="grid grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-white p-3">
-              <label className="block">
-                <span className="mb-1 block text-[11px] font-semibold text-slate-500">שם / חברה</span>
-                <input
-                  className="input"
-                  value={contractor.name}
-                  onChange={(e) => updateContractor(contractor.id, { name: e.target.value })}
-                />
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-[11px] font-semibold text-slate-500">תחום</span>
-                <input
-                  className="input"
-                  value={contractor.trade}
-                  onChange={(e) => updateContractor(contractor.id, { trade: e.target.value })}
-                />
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-[11px] font-semibold text-slate-500">היקף חוזה (₪)</span>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  className="input"
-                  value={contractor.totalValue}
-                  onChange={(e) => updateContractor(contractor.id, { totalValue: num(e.target.value) })}
-                />
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-[11px] font-semibold text-slate-500">איש קשר</span>
-                <input
-                  className="input"
-                  value={contractor.contactName || ""}
-                  onChange={(e) => updateContractor(contractor.id, { contactName: e.target.value })}
-                />
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-[11px] font-semibold text-slate-500">טלפון</span>
-                <input
-                  type="tel"
-                  dir="ltr"
-                  className="input"
-                  placeholder="050-1234567"
-                  value={contractor.phone || ""}
-                  onChange={(e) => updateContractor(contractor.id, { phone: e.target.value })}
-                />
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-[11px] font-semibold text-slate-500">אימייל</span>
-                <input
-                  type="email"
-                  dir="ltr"
-                  className="input"
-                  value={contractor.email || ""}
-                  onChange={(e) => updateContractor(contractor.id, { email: e.target.value })}
-                />
-              </label>
-              <label className="col-span-2 block">
-                <span className="mb-1 block text-[11px] font-semibold text-slate-500">הערות</span>
-                <input
-                  className="input"
-                  value={contractor.notes || ""}
-                  onChange={(e) => updateContractor(contractor.id, { notes: e.target.value })}
-                />
-              </label>
-            </div>
-          )}
 
           {mismatch && (
             <div className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
@@ -316,7 +269,7 @@ function ContractorCard({ contractor }) {
               הוספת פעימה
             </button>
             <div className="flex gap-1">
-              <button onClick={() => setEditing((v) => !v)} className="btn-ghost !px-2" aria-label="עריכת קבלן">
+              <button onClick={() => setShowEdit(true)} className="btn-ghost !px-2" aria-label="עריכת קבלן">
                 <Pencil className="h-4 w-4" />
               </button>
               <button
@@ -332,6 +285,10 @@ function ContractorCard({ contractor }) {
             </div>
           </div>
         </div>
+      )}
+
+      {showEdit && (
+        <ContractorEditModal contractor={contractor} onClose={() => setShowEdit(false)} />
       )}
     </div>
   );
