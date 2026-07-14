@@ -82,7 +82,9 @@ export const contractorSchedule = (c) => {
 };
 
 // צוואר בקבוק: חלון העבודה הסתיים ונותרו פעימות שלא שולמו
+// (קבלן שמנהל העבודה חתם על סיום עבודתו — אינו צוואר בקבוק)
 export const isBottleneck = (c) => {
+  if (c?.workCompleted) return false;
   const s = contractorSchedule(c);
   if (!s) return false;
   const hasUnpaid = (c.milestones || []).some((m) => !m.isPaid);
@@ -121,6 +123,8 @@ const CONTRACTOR_FIELD_DEFAULTS = {
 export function migrateData(parsed) {
   return {
     ...parsed,
+    // אזור מנהל עבודה: הקצאות + תתי-משימות (נשמר בגיבוי JSON אוטומטית)
+    foreman: { assignments: [], ...(parsed.foreman || {}) },
     contractors: (parsed.contractors || []).map((c) => {
       const merged = { ...CONTRACTOR_FIELD_DEFAULTS, ...c };
       const seed = initialData.contractors.find((s) => s.id === c.id);
@@ -148,7 +152,7 @@ function loadInitial() {
   } catch {
     /* corrupted storage — fall back to seed */
   }
-  return initialData;
+  return migrateData(initialData);
 }
 
 export function BudgetProvider({ children }) {
@@ -250,6 +254,44 @@ export function BudgetProvider({ children }) {
     };
     setData((d) => ({ ...d, contractors: [...d.contractors, c] }));
     return c.id;
+  }, []);
+
+  // ----- מנהל עבודה: הקצאות ותתי-משימות -----
+  // עדכון הקצאה של קבלן (יוצר אותה אם אינה קיימת). כל עדכון מקבל
+  // updatedAt — משמש למיזוג Last-Write-Wins בסנכרון מרוחק.
+  const updateForeman = useCallback((contractorId, updater) => {
+    setData((d) => {
+      const list = d.foreman?.assignments || [];
+      const idx = list.findIndex((a) => a.contractorId === contractorId);
+      const base =
+        idx === -1
+          ? {
+              contractorId,
+              visibleToForeman: false,
+              signedOff: false,
+              signedOffAt: null,
+              subTasks: [],
+            }
+          : list[idx];
+      const next = { ...updater(base), updatedAt: new Date().toISOString() };
+      const assignments =
+        idx === -1 ? [...list, next] : list.map((a, i) => (i === idx ? next : a));
+      return { ...d, foreman: { ...(d.foreman || {}), assignments } };
+    });
+  }, []);
+
+  // החלפת כל ההקצאות (משמש את מנגנון הסנכרון המרוחק)
+  const setForemanAssignments = useCallback((assignments) => {
+    setData((d) => ({ ...d, foreman: { ...(d.foreman || {}), assignments } }));
+  }, []);
+
+  // החלפת מערך הקבלנים כולו (למשל: אישור סימולציית עיכובים).
+  // תומך גם בעדכון פונקציונלי; נשמר אוטומטית ל-LocalStorage.
+  const setContractors = useCallback((next) => {
+    setData((d) => ({
+      ...d,
+      contractors: typeof next === "function" ? next(d.contractors) : next,
+    }));
   }, []);
 
   const updateContractor = useCallback((cid, patch) => {
@@ -391,6 +433,9 @@ export function BudgetProvider({ children }) {
       renamePhase,
       removePhase,
       addContractor,
+      setContractors,
+      updateForeman,
+      setForemanAssignments,
       updateContractor,
       removeContractor,
       addMilestone,
@@ -403,6 +448,9 @@ export function BudgetProvider({ children }) {
     [
       data,
       markBackedUp,
+      setContractors,
+      updateForeman,
+      setForemanAssignments,
       updateItem,
       addItem,
       removeItem,

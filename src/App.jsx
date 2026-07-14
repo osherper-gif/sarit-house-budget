@@ -1,5 +1,7 @@
 // ============================================================
 // App.jsx — מסך כניסה (סיסמה) + מסגרת האפליקציה + ניווט תחתון
+// טאבים: דשבורד · תקציב · קבלנים · תוכנית עבודה (+ סימולטור עיכובים)
+//         · יועץ אסטרטגי · מדריך ידע · גיבוי
 // ============================================================
 import { useState } from "react";
 import {
@@ -7,6 +9,8 @@ import {
   ListChecks,
   HardHat,
   CalendarRange,
+  Compass,
+  BookOpen,
   Settings,
   Home,
   Lock,
@@ -20,12 +24,29 @@ import Dashboard from "./Dashboard";
 import BudgetTable from "./BudgetTable";
 import ContractorTracker from "./ContractorTracker";
 import WorkPlan from "./WorkPlan";
+// הרכיבים החדשים (נוצרו ע"י סקריפט ההתקנה):
+import DelaySimulatorPanel from "./components/DelaySimulator";
+import StrategicAdvisor from "./components/StrategicAdvisor";
+import KnowledgeBase from "./components/KnowledgeBase";
+
+// טאב "תוכנית עבודה": הגאנט הקיים + סימולטור העיכובים החדש מתחתיו.
+// הסימולציה אינה הרסנית — שינוי נשמר רק בלחיצה מפורשת על "עדכן לוח זמנים".
+function WorkPlanTab() {
+  return (
+    <div className="space-y-4">
+      <WorkPlan />
+      <DelaySimulatorPanel />
+    </div>
+  );
+}
 
 const TABS = [
   { id: "dashboard", label: "דשבורד", icon: LayoutDashboard, component: Dashboard },
   { id: "budget", label: "תקציב", icon: ListChecks, component: BudgetTable },
   { id: "contractors", label: "קבלנים", icon: HardHat, component: ContractorTracker },
-  { id: "workplan", label: "תוכנית עבודה", icon: CalendarRange, component: WorkPlan },
+  { id: "workplan", label: "תוכנית", icon: CalendarRange, component: WorkPlanTab },
+  { id: "advisor", label: "יועץ", icon: Compass, component: StrategicAdvisor },
+  { id: "knowledge", label: "מדריך", icon: BookOpen, component: KnowledgeBase },
   { id: "settings", label: "גיבוי", icon: Settings, component: SettingsBackup },
 ];
 
@@ -151,14 +172,14 @@ function Shell() {
 
       {/* Bottom navigation — mobile first */}
       <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 backdrop-blur pb-[env(safe-area-inset-bottom)]">
-        <div className="mx-auto grid max-w-2xl grid-cols-5">
+        <div className="mx-auto grid max-w-2xl grid-cols-7">
           {TABS.map(({ id, label, icon: Icon }) => {
             const active = tab === id;
             return (
               <button
                 key={id}
                 onClick={() => setTab(id)}
-                className={`flex flex-col items-center gap-0.5 py-2.5 text-[10px] font-semibold transition-colors ${
+                className={`flex flex-col items-center gap-0.5 py-2.5 text-[9px] font-semibold transition-colors ${
                   active ? "text-indigo-600" : "text-slate-400 hover:text-slate-600"
                 }`}
                 aria-current={active ? "page" : undefined}
