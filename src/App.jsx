@@ -11,6 +11,7 @@ import {
   CalendarRange,
   Compass,
   BookOpen,
+  ClipboardCheck,
   Settings,
   Home,
   Lock,
@@ -19,7 +20,12 @@ import {
   LogIn,
 } from "lucide-react";
 import { BudgetProvider, SettingsBackup, useBudget, fmt } from "./Utilities";
-import { APP_PASSWORD, AUTH_SESSION_KEY } from "./config";
+import {
+  APP_PASSWORD,
+  AUTH_SESSION_KEY,
+  FOREMAN_PASSCODE,
+  FOREMAN_SESSION_KEY,
+} from "./config";
 import Dashboard from "./Dashboard";
 import BudgetTable from "./BudgetTable";
 import ContractorTracker from "./ContractorTracker";
@@ -28,6 +34,9 @@ import WorkPlan from "./WorkPlan";
 import DelaySimulatorPanel from "./components/DelaySimulator";
 import StrategicAdvisor from "./components/StrategicAdvisor";
 import KnowledgeBase from "./components/KnowledgeBase";
+// אזור מנהל עבודה:
+import ForemanAdmin from "./ForemanAdmin";
+import ForemanApp from "./ForemanApp";
 
 // טאב "תוכנית עבודה": הגאנט הקיים + סימולטור העיכובים החדש מתחתיו.
 // הסימולציה אינה הרסנית — שינוי נשמר רק בלחיצה מפורשת על "עדכן לוח זמנים".
@@ -47,6 +56,7 @@ const TABS = [
   { id: "workplan", label: "תוכנית", icon: CalendarRange, component: WorkPlanTab },
   { id: "advisor", label: "יועץ", icon: Compass, component: StrategicAdvisor },
   { id: "knowledge", label: "מדריך", icon: BookOpen, component: KnowledgeBase },
+  { id: "foreman", label: "שטח", icon: ClipboardCheck, component: ForemanAdmin },
   { id: "settings", label: "גיבוי", icon: Settings, component: SettingsBackup },
 ];
 
@@ -56,11 +66,15 @@ function LoginScreen({ onSuccess }) {
   const [show, setShow] = useState(false);
   const [error, setError] = useState(false);
 
+  // סיסמה אחת לשרית, קוד נפרד למנהל העבודה — אותו שדה, שני תפקידים
   const submit = (e) => {
     e.preventDefault();
     if (password === APP_PASSWORD) {
       sessionStorage.setItem(AUTH_SESSION_KEY, "1");
-      onSuccess();
+      onSuccess("sarit");
+    } else if (password === FOREMAN_PASSCODE) {
+      sessionStorage.setItem(FOREMAN_SESSION_KEY, "1");
+      onSuccess("foreman");
     } else {
       setError(true);
       setPassword("");
@@ -131,6 +145,8 @@ function LoginScreen({ onSuccess }) {
 
         <p className="mt-4 text-center text-xs text-slate-500">
           הנתונים שמורים מקומית במכשיר זה בלבד
+          <br />
+          למנהל עבודה: הזן את קוד הכניסה שקיבלת משרית
         </p>
       </div>
     </div>
@@ -172,7 +188,7 @@ function Shell() {
 
       {/* Bottom navigation — mobile first */}
       <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 backdrop-blur pb-[env(safe-area-inset-bottom)]">
-        <div className="mx-auto grid max-w-2xl grid-cols-7">
+        <div className="mx-auto grid max-w-2xl grid-cols-8">
           {TABS.map(({ id, label, icon: Icon }) => {
             const active = tab === id;
             return (
@@ -196,12 +212,30 @@ function Shell() {
 }
 
 export default function App() {
-  const [authed, setAuthed] = useState(
-    () => sessionStorage.getItem(AUTH_SESSION_KEY) === "1"
+  // תפקיד: "sarit" (אפליקציה מלאה) / "foreman" (תת-אפליקציית שטח) / null
+  const [role, setRole] = useState(() =>
+    sessionStorage.getItem(AUTH_SESSION_KEY) === "1"
+      ? "sarit"
+      : sessionStorage.getItem(FOREMAN_SESSION_KEY) === "1"
+      ? "foreman"
+      : null
   );
 
-  if (!authed) {
-    return <LoginScreen onSuccess={() => setAuthed(true)} />;
+  if (!role) {
+    return <LoginScreen onSuccess={setRole} />;
+  }
+
+  if (role === "foreman") {
+    return (
+      <BudgetProvider>
+        <ForemanApp
+          onLogout={() => {
+            sessionStorage.removeItem(FOREMAN_SESSION_KEY);
+            setRole(null);
+          }}
+        />
+      </BudgetProvider>
+    );
   }
 
   return (

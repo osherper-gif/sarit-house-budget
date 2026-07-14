@@ -30,6 +30,7 @@ const fmtShort = (d) =>
 function rowStatus(c) {
   const s = contractorSchedule(c);
   const allPaid = c.milestones.length > 0 && c.milestones.every((m) => m.isPaid);
+  if (c.workCompleted) return "done"; // חתימת מנהל עבודה
   if (isBottleneck(c)) return "late";
   if (allPaid) return "done";
   if (s && s.start.getTime() <= Date.now() && Date.now() <= s.end.getTime()) return "active";
